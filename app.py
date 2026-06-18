@@ -1,175 +1,175 @@
 import streamlit as st
-from collections import deque
-from datetime import datetime, timedelta
+import pandas as pd
+import random
 
 st.set_page_config(
-    page_title="CrowdMetro",
+    page_title="Subway Live Crowd",
     page_icon="🚇",
     layout="wide"
 )
 
-# ---------------------------------
-# 지하철 데이터
-# ---------------------------------
-
-subway_lines = {
-    "1호선": [
-        "서울역",
-        "시청",
-        "종각",
-        "종로3가",
-        "동대문"
-    ],
-    "2호선": [
-        "시청",
-        "을지로입구",
-        "을지로3가",
-        "동대문역사문화공원",
-        "신당"
-    ],
-    "3호선": [
-        "종로3가",
-        "을지로3가",
-        "충무로",
-        "약수",
-        "옥수"
-    ]
-}
-
-# ---------------------------------
-# 최초 실행
-# ---------------------------------
+# -----------------------
+# 초기 데이터
+# -----------------------
 
 if "crowd_data" not in st.session_state:
     st.session_state.crowd_data = {
         "1호선": [2, 2, 3],
-        "2호선": [4, 5, 4],
-        "3호선": [2, 3, 2]
+        "2호선": [4, 4, 5],
+        "3호선": [2, 3, 2],
+        "4호선": [3, 3, 4],
+        "5호선": [1, 2, 2],
+        "6호선": [2, 2, 3],
+        "7호선": [4, 3, 4],
+        "8호선": [2, 2, 2],
+        "9호선": [5, 4, 5],
+        "신분당선": [2, 2, 1],
+        "공항철도": [1, 2, 1]
     }
 
-# ---------------------------------
-# 그래프 생성
-# ---------------------------------
+# -----------------------
+# 함수
+# -----------------------
 
-graph = {}
-station_lines = {}
-
-for line, stations in subway_lines.items():
-
-    for station in stations:
-        graph.setdefault(station, [])
-        station_lines.setdefault(station, []).append(line)
-
-    for i in range(len(stations)-1):
-        a = stations[i]
-        b = stations[i+1]
-
-        graph[a].append(b)
-        graph[b].append(a)
-
-stations = sorted(graph.keys())
-
-# ---------------------------------
-# 경로 찾기
-# ---------------------------------
-
-def find_route(start, end):
-
-    queue = deque([[start]])
-    visited = set()
-
-    while queue:
-
-        path = queue.popleft()
-        node = path[-1]
-
-        if node == end:
-            return path
-
-        if node not in visited:
-            visited.add(node)
-
-            for next_station in graph[node]:
-                new_path = list(path)
-                new_path.append(next_station)
-                queue.append(new_path)
-
-    return None
-
-# ---------------------------------
-# 혼잡도 계산
-# ---------------------------------
-
-def get_avg(line):
-    data = st.session_state.crowd_data[line]
-    return round(sum(data)/len(data), 1)
-
-# ---------------------------------
-# 색상
-# ---------------------------------
+def avg_crowd(line):
+    values = st.session_state.crowd_data[line]
+    return round(sum(values) / len(values), 1)
 
 def crowd_color(score):
-
     if score <= 2:
         return "green"
-
     elif score == 3:
         return "orange"
-
     else:
         return "red"
 
-# ---------------------------------
+def crowd_text(score):
+    if score <= 2:
+        return "여유"
+    elif score == 3:
+        return "보통"
+    else:
+        return "혼잡"
+
+# -----------------------
 # 제목
-# ---------------------------------
+# -----------------------
 
-st.title("🚇 CrowdMetro")
-st.subheader("실시간 지하철 혼잡도 공유 서비스")
+st.title("🚇 Subway Live Crowd")
+st.caption("실시간 사용자 참여형 지하철 혼잡도 공유 서비스")
 
-# ---------------------------------
-# 현재 혼잡도
-# ---------------------------------
+# -----------------------
+# 경로 검색
+# -----------------------
 
-st.header("📊 노선별 혼잡도")
+st.header("📍 출발지 / 도착지 검색")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    start_station = st.text_input("출발역")
+
+with col2:
+    end_station = st.text_input("도착역")
+
+if start_station and end_station:
+
+    route_data = []
+
+    for line in st.session_state.crowd_data.keys():
+
+        crowd = avg_crowd(line)
+
+        travel_time = random.randint(15, 50)
+
+        route_data.append({
+            "노선": line,
+            "예상시간(분)": travel_time,
+            "평균혼잡도": crowd
+        })
+
+    route_df = pd.DataFrame(route_data)
+
+    route_df = route_df.sort_values(
+        by=["평균혼잡도", "예상시간(분)"]
+    )
+
+    st.subheader("🚆 추천 노선")
+
+    st.dataframe(
+        route_df,
+        use_container_width=True
+    )
+
+# -----------------------
+# 도착 예정 열차
+# -----------------------
+
+st.header("⏱️ 도착 예정 열차")
+
+arrival_data = []
+
+for line in st.session_state.crowd_data.keys():
+
+    arrival_data.append({
+        "노선": line,
+        "도착예정(분)": random.randint(1, 10),
+        "혼잡도": avg_crowd(line)
+    })
+
+arrival_df = pd.DataFrame(arrival_data)
+
+st.dataframe(
+    arrival_df,
+    use_container_width=True
+)
+
+# -----------------------
+# 혼잡도 현황
+# -----------------------
+
+st.header("📊 실시간 혼잡도")
 
 cols = st.columns(3)
 
-for idx, line in enumerate(subway_lines.keys()):
+for idx, line in enumerate(st.session_state.crowd_data.keys()):
 
-    avg = get_avg(line)
-    color = crowd_color(round(avg))
+    score = avg_crowd(line)
 
-    with cols[idx]:
+    color = crowd_color(round(score))
+
+    with cols[idx % 3]:
 
         st.markdown(
             f"""
             <div style="
-            background-color:{color};
-            padding:20px;
-            border-radius:10px;
-            color:white;
-            text-align:center;
+                background:{color};
+                padding:15px;
+                border-radius:10px;
+                color:white;
+                margin-bottom:10px;
             ">
-            <h3>{line}</h3>
-            <h1>{avg}/5</h1>
+            <h4>{line}</h4>
+            <h2>{score}</h2>
+            <p>{crowd_text(round(score))}</p>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-# ---------------------------------
-# 제보하기
-# ---------------------------------
+# -----------------------
+# 사용자 입력
+# -----------------------
 
-st.header("🙋 현재 탑승 중이라면 혼잡도 제보")
+st.header("🙋 혼잡도 제보")
 
-line_select = st.selectbox(
-    "노선 선택",
-    list(subway_lines.keys())
+selected_line = st.selectbox(
+    "현재 탑승 노선",
+    list(st.session_state.crowd_data.keys())
 )
 
-score = st.slider(
-    "혼잡도 선택",
+user_score = st.slider(
+    "현재 얼마나 붐비나요?",
     1,
     5,
     3
@@ -177,141 +177,41 @@ score = st.slider(
 
 if st.button("혼잡도 등록"):
 
-    try:
-        st.session_state.crowd_data[line_select].append(score)
+    st.session_state.crowd_data[selected_line].append(user_score)
 
-        st.success(
-            f"{line_select} 혼잡도 {score} 등록 완료"
-        )
-
-    except Exception as e:
-        st.error(e)
-
-# ---------------------------------
-# 경로 추천
-# ---------------------------------
-
-st.header("🗺️ 경로 추천")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    start_station = st.selectbox(
-        "출발역",
-        stations
+    st.success(
+        f"{selected_line} 혼잡도 등록 완료!"
     )
 
-with col2:
-    end_station = st.selectbox(
-        "도착역",
-        stations,
-        index=min(1, len(stations)-1)
+# -----------------------
+# 전체 현황
+# -----------------------
+
+st.header("📈 전체 혼잡도 순위")
+
+ranking = []
+
+for line in st.session_state.crowd_data.keys():
+
+    ranking.append(
+        {
+            "노선": line,
+            "평균혼잡도": avg_crowd(line)
+        }
     )
 
-if st.button("경로 찾기"):
+ranking_df = pd.DataFrame(ranking)
 
-    try:
+ranking_df = ranking_df.sort_values(
+    by="평균혼잡도",
+    ascending=False
+)
 
-        if start_station == end_station:
-            st.warning(
-                "출발역과 도착역이 같습니다."
-            )
-            st.stop()
+st.dataframe(
+    ranking_df,
+    use_container_width=True
+)
 
-        route = find_route(
-            start_station,
-            end_station
-        )
-
-        if route is None:
-            st.error("경로 없음")
-            st.stop()
-
-        station_count = len(route)-1
-
-        travel_time = station_count * 2
-
-        arrival = (
-            datetime.now()
-            + timedelta(minutes=travel_time)
-        )
-
-        st.success("추천 경로")
-
-        st.write(
-            " ➜ ".join(route)
-        )
-
-        c1, c2, c3 = st.columns(3)
-
-        c1.metric(
-            "이동역 수",
-            station_count
-        )
-
-        c2.metric(
-            "예상 소요시간",
-            f"{travel_time}분"
-        )
-
-        c3.metric(
-            "도착 예정",
-            arrival.strftime("%H:%M")
-        )
-
-        # 혼잡도 낮은 노선 추천
-
-        best_line = min(
-            subway_lines.keys(),
-            key=lambda x: get_avg(x)
-        )
-
-        st.info(
-            f"""
-🚇 가장 덜 붐비는 노선 추천
-
-{best_line}
-
-현재 평균 혼잡도 : {get_avg(best_line)}
-"""
-        )
-
-    except Exception as e:
-        st.error(
-            f"오류 발생 : {e}"
-        )
-
-# ---------------------------------
-# 다음 열차 정보
-# ---------------------------------
-
-st.header("🚆 다음 열차 혼잡도 예측")
-
-for line in subway_lines.keys():
-
-    score = get_avg(line)
-
-    color = crowd_color(round(score))
-
-    wait = 2 + list(subway_lines.keys()).index(line) * 3
-
-    st.markdown(
-        f"""
-<div style="
-background:{color};
-padding:15px;
-border-radius:10px;
-color:white;
-margin-bottom:10px;
-">
-<b>{line}</b><br>
-도착 예정 : {wait}분 후<br>
-혼잡도 : {score}/5
-</div>
-""",
-        unsafe_allow_html=True
-    )
-
-st.caption(
-    "혼잡도는 사용자 제보 평균값 기반입니다."
+st.info(
+    "실제 서비스에서는 공공데이터포털 지하철 실시간 도착정보 API와 연동하여 운영할 수 있습니다."
 )
